@@ -1,105 +1,471 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>License Server</title>
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
-  
-  <script>
-    // ========================
-    // PASTE YOUR CONFIG HERE
-    // ========================
-    const firebaseConfig = {
-      apiKey: "AIzaSyB1GydpnDsmHdmgsb6Luz205wg_E6coiUU",          // From Firebase Project Settings
-      projectId: "license-server-aa2d6",   // From Firebase
-      appId: "1:1047228554073:web:65db08125de2e03dfbca48"  // From Firebase
-    };
-
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    // ========================
-    // LICENSE CHECK FUNCTION
-    // ========================
-    async function handleLicenseCheck(request) {
-      try {
-        const { key } = await request.json();
-        
-        // Check if license exists
-        const doc = await db.collection("licenses").doc(key).get();
-        
-        if (doc.exists) {
-          return new Response(JSON.stringify({ valid: false }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        } else {
-          // Add new license
-          await db.collection("licenses").doc(key).set({
-            used: true,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          return new Response(JSON.stringify({ valid: true }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          });
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Key Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-    }
 
-    // ========================
-    // HEALTH CHECK ENDPOINT
-    // ========================
-    function handleHealthCheck() {
-      return new Response("Server is running", { status: 200 });
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
 
-    // ========================
-    // REQUEST ROUTER
-    // ========================
-    self.addEventListener('fetch', (event) => {
-      const url = new URL(event.request.url);
-      
-      if (url.pathname === '/check_license' && event.request.method === 'POST') {
-        event.respondWith(handleLicenseCheck(event.request));
-      } else if (url.pathname === '/health') {
-        event.respondWith(handleHealthCheck());
-      }
-    });
-  </script>
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #667eea;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        input[type="text"], input[type="number"], input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus, input[type="number"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-top: 4px solid #667eea;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-label {
+            color: #7f8c8d;
+            font-weight: 600;
+        }
+
+        .keys-list {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .key-item {
+            padding: 15px;
+            border-bottom: 1px solid #e1e8ed;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .key-item:last-child {
+            border-bottom: none;
+        }
+
+        .key-code {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+
+        .key-status {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+
+        .status-unused {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-used {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .header {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
 </head>
 <body>
-  <h1>License Server Running</h1>
-  <p>This page handles license checks via Firebase.</p>
-  
-  <!-- Optional: Test form for manual checks -->
-  <div style="margin-top: 2rem; border: 1px solid #ccc; padding: 1rem;">
-    <h3>Test License Check</h3>
-    <input type="text" id="licenseKey" placeholder="Enter license key">
-    <button onclick="testCheck()">Check License</button>
-    <div id="result" style="margin-top: 0.5rem;"></div>
-    
+    <div class="container">
+        <div class="header">
+            <h1>🔐 License Key Manager</h1>
+            <p>Secure one-time license key management system</p>
+        </div>
+
+        <div class="content">
+            <!-- Authentication Section -->
+            <div class="section" id="auth-section">
+                <h2>🔑 Authentication</h2>
+                <div class="form-group">
+                    <label for="api-key">API Key:</label>
+                    <input type="password" id="api-key" placeholder="Enter your API key">
+                </div>
+                <button class="btn" onclick="authenticate()">Authenticate</button>
+            </div>
+
+            <!-- Main Dashboard (hidden initially) -->
+            <div id="dashboard" class="hidden">
+                <!-- Key Generation Section -->
+                <div class="section">
+                    <h2>🎯 Generate License Keys</h2>
+                    <div class="form-group">
+                        <label for="num-keys">Number of keys to generate (1-10):</label>
+                        <input type="number" id="num-keys" min="1" max="10" value="1">
+                    </div>
+                    <button class="btn" onclick="generateKeys()">Generate Keys</button>
+                    
+                    <div id="generated-keys" class="hidden">
+                        <h3 style="margin-top: 30px; color: #2c3e50;">Generated Keys:</h3>
+                        <div id="keys-output" class="keys-list"></div>
+                    </div>
+                </div>
+
+                <!-- Statistics Section -->
+                <div class="section">
+                    <h2>📊 Statistics</h2>
+                    <button class="btn btn-secondary" onclick="loadStats()">Refresh Stats</button>
+                    <div class="stats-grid" id="stats-container">
+                        <div class="stat-card">
+                            <div class="stat-number" id="total-keys">-</div>
+                            <div class="stat-label">Total Keys</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="used-keys">-</div>
+                            <div class="stat-label">Used Keys</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-number" id="unused-keys">-</div>
+                            <div class="stat-label">Available Keys</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- All Keys Section -->
+                <div class="section">
+                    <h2>📋 All License Keys</h2>
+                    <button class="btn btn-secondary" onclick="loadAllKeys()">Load All Keys</button>
+                    <div id="all-keys-list" class="keys-list hidden"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-      // Test function (optional)
-      async function testCheck() {
-        const key = document.getElementById('licenseKey').value;
-        const response = await fetch('/check_license', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key })
-        });
-        const data = await response.json();
-        document.getElementById('result').innerText = 
-          data.valid ? '✅ Valid license' : '❌ License already used';
-      }
+        let apiKey = '';
+        const API_BASE = '/api';
+
+        function showAlert(message, type = 'success') {
+            const existingAlert = document.querySelector('.alert');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            const content = document.querySelector('.content');
+            content.insertBefore(alert, content.firstChild);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function authenticate() {
+            const keyInput = document.getElementById('api-key');
+            apiKey = keyInput.value.trim();
+            
+            if (!apiKey) {
+                showAlert('Please enter an API key', 'error');
+                return;
+            }
+
+            // Test the API key by trying to get stats
+            fetch(`${API_BASE}/keys/stats`, {
+                headers: {
+                    'X-API-Key': apiKey
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('auth-section').classList.add('hidden');
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    showAlert('Authentication successful!');
+                    loadStats();
+                } else {
+                    throw new Error('Invalid API key');
+                }
+            })
+            .catch(error => {
+                showAlert('Authentication failed: ' + error.message, 'error');
+            });
+        }
+
+        async function generateKeys() {
+            const numKeys = parseInt(document.getElementById('num-keys').value);
+            
+            if (numKeys < 1 || numKeys > 10) {
+                showAlert('Please enter a number between 1 and 10', 'error');
+                return;
+            }
+
+            const outputDiv = document.getElementById('keys-output');
+            const generatedSection = document.getElementById('generated-keys');
+            
+            outputDiv.innerHTML = '<div style="text-align: center; padding: 20px;">Generating keys...</div>';
+            generatedSection.classList.remove('hidden');
+
+            const keys = [];
+            
+            for (let i = 0; i < numKeys; i++) {
+                const key = generateLicenseKey();
+                
+                try {
+                    const response = await fetch(`${API_BASE}/keys`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-API-Key': apiKey
+                        },
+                        body: JSON.stringify({ key: key })
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        keys.push(data.key);
+                    } else {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to add key');
+                    }
+                } catch (error) {
+                    showAlert(`Error generating key ${i + 1}: ${error.message}`, 'error');
+                }
+            }
+
+            // Display generated keys
+            outputDiv.innerHTML = keys.map(key => `
+                <div class="key-item">
+                    <span class="key-code">${key.key}</span>
+                    <span class="key-status status-unused">Unused</span>
+                </div>
+            `).join('');
+
+            showAlert(`Successfully generated ${keys.length} license key(s)!`);
+            loadStats(); // Refresh stats
+        }
+
+        function generateLicenseKey() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let result = 'FFSFER-';
+            for (let i = 0; i < 5; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        function loadStats() {
+            fetch(`${API_BASE}/keys/stats`, {
+                headers: {
+                    'X-API-Key': apiKey
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('total-keys').textContent = data.total_keys;
+                document.getElementById('used-keys').textContent = data.used_keys;
+                document.getElementById('unused-keys').textContent = data.unused_keys;
+            })
+            .catch(error => {
+                showAlert('Error loading stats: ' + error.message, 'error');
+            });
+        }
+
+        function loadAllKeys() {
+            const listDiv = document.getElementById('all-keys-list');
+            listDiv.innerHTML = '<div style="text-align: center; padding: 20px;">Loading keys...</div>';
+            listDiv.classList.remove('hidden');
+
+            fetch(`${API_BASE}/keys`, {
+                headers: {
+                    'X-API-Key': apiKey
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.keys.length === 0) {
+                    listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #7f8c8d;">No keys found</div>';
+                    return;
+                }
+
+                listDiv.innerHTML = data.keys.map(key => `
+                    <div class="key-item">
+                        <div>
+                            <span class="key-code">${key.key}</span>
+                            <div style="font-size: 0.9em; color: #7f8c8d; margin-top: 5px;">
+                                Created: ${new Date(key.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                        <span class="key-status ${key.is_used ? 'status-used' : 'status-unused'}">
+                            ${key.is_used ? 'Used' : 'Unused'}
+                        </span>
+                    </div>
+                `).join('');
+            })
+            .catch(error => {
+                showAlert('Error loading keys: ' + error.message, 'error');
+                listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #e74c3c;">Error loading keys</div>';
+            });
+        }
+
+        // Auto-load stats every 30 seconds if dashboard is visible
+        setInterval(() => {
+            if (!document.getElementById('dashboard').classList.contains('hidden')) {
+                loadStats();
+            }
+        }, 30000);
     </script>
-  </div>
 </body>
 </html>
