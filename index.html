@@ -1,6 +1,105 @@
 <!DOCTYPE html>
 <html>
+<head>
+  <title>License Server</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+  
+  <script>
+    // ========================
+    // PASTE YOUR CONFIG HERE
+    // ========================
+    const firebaseConfig = {
+      apiKey: "AIzaSyB1GydpnDsmHdmgsb6Luz205wg_E6coiUU",          // From Firebase Project Settings
+      projectId: "license-server-aa2d6",   // From Firebase
+      appId: "1:1047228554073:web:65db08125de2e03dfbca48"  // From Firebase
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // ========================
+    // LICENSE CHECK FUNCTION
+    // ========================
+    async function handleLicenseCheck(request) {
+      try {
+        const { key } = await request.json();
+        
+        // Check if license exists
+        const doc = await db.collection("licenses").doc(key).get();
+        
+        if (doc.exists) {
+          return new Response(JSON.stringify({ valid: false }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          // Add new license
+          await db.collection("licenses").doc(key).set({
+            used: true,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          return new Response(JSON.stringify({ valid: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (error) {
+        return new Response(JSON.stringify({ error: error.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ========================
+    // HEALTH CHECK ENDPOINT
+    // ========================
+    function handleHealthCheck() {
+      return new Response("Server is running", { status: 200 });
+    }
+
+    // ========================
+    // REQUEST ROUTER
+    // ========================
+    self.addEventListener('fetch', (event) => {
+      const url = new URL(event.request.url);
+      
+      if (url.pathname === '/check_license' && event.request.method === 'POST') {
+        event.respondWith(handleLicenseCheck(event.request));
+      } else if (url.pathname === '/health') {
+        event.respondWith(handleHealthCheck());
+      }
+    });
+  </script>
+</head>
 <body>
   <h1>License Server Running</h1>
+  <p>This page handles license checks via Firebase.</p>
+  
+  <!-- Optional: Test form for manual checks -->
+  <div style="margin-top: 2rem; border: 1px solid #ccc; padding: 1rem;">
+    <h3>Test License Check</h3>
+    <input type="text" id="licenseKey" placeholder="Enter license key">
+    <button onclick="testCheck()">Check License</button>
+    <div id="result" style="margin-top: 0.5rem;"></div>
+    
+    <script>
+      // Test function (optional)
+      async function testCheck() {
+        const key = document.getElementById('licenseKey').value;
+        const response = await fetch('/check_license', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        });
+        const data = await response.json();
+        document.getElementById('result').innerText = 
+          data.valid ? '✅ Valid license' : '❌ License already used';
+      }
+    </script>
+  </div>
 </body>
 </html>
